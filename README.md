@@ -233,3 +233,4 @@ curl -X POST "http://127.0.0.1:8080/order/create" \
 6. **Seata 启动依赖**：order / stock 的 Seata 客户端启动时会向 Seata Server 建立连接，Seata Server 或 Nacos 未启动时会阻塞在 `Initializing Global Transaction Clients ...`，属正常现象——中间件就绪后即可快速完成启动。Docker 编排已通过健康检查 + `depends_on` 保证顺序。
 "# FooddOrderingSystem" 
 "# FooddOrderingSystem" 
+"# FooddOrderingSystem" 
