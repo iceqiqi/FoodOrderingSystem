@@ -1,0 +1,299 @@
+# ============================================================================
+# 校园外卖微服务系统 —— Docker Compose 编排
+# 包含：MySQL、Nacos、Seata Server、Zipkin、Sentinel Dashboard、7 个微服务
+#
+# 使用前：
+#   1. 安装 Docker Desktop（含 Docker Compose v2）
+#   2. 在项目根目录先构建一次 jar：  mvn clean package -DskipTests
+#   3. 启动：  docker-compose up -d --build
+#   4. 停止：  docker-compose down
+# ============================================================================
+
+services:
+
+  # --------------------------------------------------------------------------
+  # MySQL：业务库 + OAuth2 表 + Seata 库，首次启动自动执行 database.txt 建库建表
+  # --------------------------------------------------------------------------
+  mysql:
+    image: mysql:8.0.33
+    container_name: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: "123456"
+      MYSQL_ROOT_HOST: "%"          # 允许其他容器用 root 远程连接
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_general_ci
+      - --default-time-zone=+08:00
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./database.txt:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p123456"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    restart: unless-stopped
+
+  # --------------------------------------------------------------------------
+  # Nacos 注册中心 + 配置中心（单机模式，版本与客户端 nacos-client 1.4.2 匹配）
+  # --------------------------------------------------------------------------
+  nacos:
+    image: nacos/nacos-server:1.4.2
+    container_name: nacos
+    environment:
+      MODE: standalone
+      JVM_XMS: 256m
+      JVM_XMX: 512m
+      JVM_XMN: 128m
+    ports:
+      - "8848:8848"
+    volumes:
+      - nacos-data:/home/nacos/data
+      - nacos-logs:/home/nacos/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8848/nacos/v1/console/health/readiness"]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 30s
+    restart: unless-stopped
+
+  # --------------------------------------------------------------------------
+  # Seata 配置发布（一次性任务）：把 seataServer.properties 写入 Nacos 配置中心
+  # --------------------------------------------------------------------------
+  seata-config-init:
+    image: curlimages/curl:8.2.1
+    container_name: seata-config-init
+    depends_on:
+      - nacos
+    volumes:
+      - ./deploy/seata/seataServer-docker.properties:/seataServer.properties:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo ">>> waiting for nacos..."
+        until curl -sf http://nacos:8848/nacos/v1/console/health/readiness >/dev/null 2>&1; do
+          echo "nacos not ready, retry in 5s..."; sleep 5;
+        done
+        echo ">>> publishing seataServer.properties to nacos (group=SEATA_GROUP)..."
+        curl -s -X POST "http://nacos:8848/nacos/v1/cs/configs" \
+          --data-urlencode "dataId=seataServer.properties" \
+          --data-urlencode "group=SEATA_GROUP" \
+          --data-urlencode "content=$(cat /seataServer.properties)" \
+          --data-urlencode "type=properties"
+        echo ">>> seata config published."
+    restart: "no"
+
+  # --------------------------------------------------------------------------
+  # Seata Server（AT 模式事务协调器，注册到 Nacos，事务日志存 MySQL seata 库）
+  # --------------------------------------------------------------------------
+  seata-server:
+    image: seataio/seata-server:1.4.2
+    container_name: seata-server
+    hostname: seata-server
+    environment:
+      SEATA_IP: seata-server
+      SEATA_PORT: "8091"
+    ports:
+      - "8091:8091"
+    volumes:
+      - ./deploy/seata/registry-docker.conf:/seata-server/resources/registry.conf:ro
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+      seata-config-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # --------------------------------------------------------------------------
+  # Zipkin 链路追踪（内存存储，端口 9411）
+  # --------------------------------------------------------------------------
+  zipkin:
+    image: openzipkin/zipkin:2.23.2
+    container_name: zipkin
+    environment:
+      JAVA_OPTS: "-Xms128m -Xmx256m"
+    ports:
+      - "9411:9411"
+    restart: unless-stopped
+
+  # --------------------------------------------------------------------------
+  # Sentinel Dashboard 控制台（端口 8858，登录 sentinel / sentinel）
+  # --------------------------------------------------------------------------
+  sentinel-dashboard:
+    image: bladex/sentinel-dashboard:1.8.6
+    container_name: sentinel-dashboard
+    ports:
+      - "8858:8858"
+    restart: unless-stopped
+
+  # ==========================================================================
+  # 7 个微服务
+  # ==========================================================================
+
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+    container_name: gateway
+    ports:
+      - "8080:8080"
+    environment:
+      TZ: Asia/Shanghai
+      SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR: nacos:8848
+      SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR: nacos:8848
+      SPRING_ZIPKIN_BASE_URL: http://zipkin:9411
+      SPRING_BOOT_ADMIN_CLIENT_ENABLED: "false"
+    depends_on:
+      nacos:
+        condition: service_healthy
+      zipkin:
+        condition: service_started
+    restart: unless-stopped
+
+  user:
+    build:
+      context: ./user
+      dockerfile: Dockerfile
+    container_name: user
+    ports:
+      - "8004:8004"
+    environment:
+      TZ: Asia/Shanghai
+      SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR: nacos:8848
+      SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR: nacos:8848
+      SPRING_ZIPKIN_BASE_URL: http://zipkin:9411
+      SPRING_BOOT_ADMIN_CLIENT_ENABLED: "false"
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/user_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+    restart: unless-stopped
+
+  shop:
+    build:
+      context: ./shop
+      dockerfile: Dockerfile
+    container_name: shop
+    ports:
+      - "8001:8001"
+    environment:
+      TZ: Asia/Shanghai
+      SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR: nacos:8848
+      SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR: nacos:8848
+      SPRING_ZIPKIN_BASE_URL: http://zipkin:9411
+      SPRING_BOOT_ADMIN_CLIENT_ENABLED: "false"
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/shop_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+    restart: unless-stopped
+
+  dish:
+    build:
+      context: ./dish
+      dockerfile: Dockerfile
+    container_name: dish
+    ports:
+      - "8002:8002"
+    environment:
+      TZ: Asia/Shanghai
+      SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR: nacos:8848
+      SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR: nacos:8848
+      SPRING_ZIPKIN_BASE_URL: http://zipkin:9411
+      SPRING_BOOT_ADMIN_CLIENT_ENABLED: "false"
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/dish_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false
+      SPRING_CLOUD_SENTINEL_TRANSPORT_DASHBOARD: sentinel-dashboard:8858
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+    restart: unless-stopped
+
+  order:
+    build:
+      context: ./order
+      dockerfile: Dockerfile
+    container_name: order
+    ports:
+      - "8003:8003"
+    environment:
+      TZ: Asia/Shanghai
+      SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR: nacos:8848
+      SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR: nacos:8848
+      SPRING_ZIPKIN_BASE_URL: http://zipkin:9411
+      SPRING_BOOT_ADMIN_CLIENT_ENABLED: "false"
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/order_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false
+      SPRING_CLOUD_SENTINEL_TRANSPORT_DASHBOARD: sentinel-dashboard:8858
+      SEATA_REGISTRY_NACOS_SERVER_ADDR: nacos:8848
+      SEATA_CONFIG_NACOS_SERVER_ADDR: nacos:8848
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+      seata-server:
+        condition: service_started
+    restart: unless-stopped
+
+  stock:
+    build:
+      context: ./stock
+      dockerfile: Dockerfile
+    container_name: stock
+    ports:
+      - "8005:8005"
+    environment:
+      TZ: Asia/Shanghai
+      SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR: nacos:8848
+      SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR: nacos:8848
+      SPRING_ZIPKIN_BASE_URL: http://zipkin:9411
+      SPRING_BOOT_ADMIN_CLIENT_ENABLED: "false"
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/stock_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false
+      SEATA_REGISTRY_NACOS_SERVER_ADDR: nacos:8848
+      SEATA_CONFIG_NACOS_SERVER_ADDR: nacos:8848
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+      seata-server:
+        condition: service_started
+    restart: unless-stopped
+
+  pay:
+    build:
+      context: ./pay
+      dockerfile: Dockerfile
+    container_name: pay
+    ports:
+      - "8006:8006"
+    environment:
+      TZ: Asia/Shanghai
+      SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR: nacos:8848
+      SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR: nacos:8848
+      SPRING_ZIPKIN_BASE_URL: http://zipkin:9411
+      SPRING_BOOT_ADMIN_CLIENT_ENABLED: "false"
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/pay_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nacos:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
+  nacos-data:
+  nacos-logs:

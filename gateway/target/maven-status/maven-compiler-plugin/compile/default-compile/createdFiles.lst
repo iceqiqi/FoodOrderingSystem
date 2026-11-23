@@ -1,0 +1,4 @@
+cn\js\ccit\gateway\config\WebClientConfig.class
+cn\js\ccit\gateway\filter\AuthGlobalFilter.class
+cn\js\ccit\gateway\filter\AuthGlobalFilter$AuthInfo.class
+cn\js\ccit\gateway\GatewayApplication.class

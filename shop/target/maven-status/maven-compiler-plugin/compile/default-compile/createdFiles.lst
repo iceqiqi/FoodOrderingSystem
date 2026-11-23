@@ -1,0 +1,5 @@
+cn\js\ccit\shop\entity\Shop.class
+cn\js\ccit\shop\service\ShopService.class
+cn\js\ccit\shop\ShopApplication.class
+cn\js\ccit\shop\mapper\ShopMapper.class
+cn\js\ccit\shop\controller\ShopController.class

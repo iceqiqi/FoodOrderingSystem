@@ -1,0 +1,7 @@
+cn\js\ccit\user\controller\UserController.class
+cn\js\ccit\user\entity\UserInfo.class
+cn\js\ccit\user\mapper\UserMapper.class
+cn\js\ccit\user\config\AuthorizationServerConfig.class
+cn\js\ccit\user\service\UserService.class
+cn\js\ccit\user\UserApplication.class
+cn\js\ccit\user\config\SecurityConfig.class

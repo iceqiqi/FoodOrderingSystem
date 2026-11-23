@@ -1,0 +1,300 @@
+-- ================================================================================
+-- 校园外卖微服务系统 —— 数据库初始化脚本（MySQL 5.7 / 8.0 通用）
+-- 共 7 个库：user_db / shop_db / dish_db / stock_db / order_db / pay_db / seata
+-- 用法：整段复制到 Navicat / DataGrip 的 SQL 窗口，直接点执行即可。
+-- 说明：脚本可重复执行（CREATE TABLE IF NOT EXISTS + INSERT IGNORE），不会报"表已存在"。
+-- ================================================================================
+
+
+-- ================================================================================
+-- 1. user_db 用户库（用户服务，端口 8004）
+-- ================================================================================
+CREATE DATABASE IF NOT EXISTS `user_db` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+USE `user_db`;
+
+CREATE TABLE IF NOT EXISTS `user_info` (
+  `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `username`    VARCHAR(50)  NOT NULL                COMMENT '用户名',
+  `password`    VARCHAR(100) NOT NULL                COMMENT '密码',
+  `nickname`    VARCHAR(50)  DEFAULT NULL            COMMENT '昵称',
+  `phone`       VARCHAR(20)  DEFAULT NULL            COMMENT '手机号',
+  `role`        VARCHAR(20)  NOT NULL DEFAULT 'USER' COMMENT '角色：ADMIN/MERCHANT/USER',
+  `gold_coin`   INT          NOT NULL DEFAULT 0      COMMENT '金币余额',
+  `status`      TINYINT      NOT NULL DEFAULT 1      COMMENT '状态：1启用 0禁用',
+  `create_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_username` (`username`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
+
+-- 测试数据（登录用 user1 / 123456）
+INSERT IGNORE INTO `user_info` (`id`, `username`, `password`, `nickname`, `phone`, `role`, `gold_coin`, `status`) VALUES
+(1, 'admin',    '123456', '管理员',   '13800000001', 'ADMIN',    0,   1),
+(2, 'merchant', '123456', '商家老板', '13800000002', 'MERCHANT', 0,   1),
+(3, 'user1',    '123456', '测试用户', '13800000003', 'USER',     100, 1);
+
+
+-- ================================================================================
+-- 2. shop_db 店铺库（店铺服务，端口 8001）
+-- ================================================================================
+CREATE DATABASE IF NOT EXISTS `shop_db` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+USE `shop_db`;
+
+CREATE TABLE IF NOT EXISTS `shop` (
+  `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `shop_name`   VARCHAR(100) NOT NULL                COMMENT '店铺名称',
+  `owner_id`    BIGINT       DEFAULT NULL            COMMENT '店主用户ID',
+  `address`     VARCHAR(255) DEFAULT NULL            COMMENT '店铺地址',
+  `phone`       VARCHAR(20)  DEFAULT NULL            COMMENT '联系电话',
+  `status`      TINYINT      NOT NULL DEFAULT 1      COMMENT '状态：1营业 0停业',
+  `create_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='店铺表';
+
+-- 测试数据
+INSERT IGNORE INTO `shop` (`id`, `shop_name`, `owner_id`, `address`, `phone`, `status`) VALUES
+(1, '第一食堂快餐店', 2, '校园第一食堂 1 楼', '13900000001', 1);
+
+
+-- ================================================================================
+-- 3. dish_db 菜品库（菜品服务，端口 8002）
+-- ================================================================================
+CREATE DATABASE IF NOT EXISTS `dish_db` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+USE `dish_db`;
+
+CREATE TABLE IF NOT EXISTS `dish` (
+  `id`          BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `shop_id`     BIGINT        NOT NULL                COMMENT '所属店铺ID',
+  `dish_name`   VARCHAR(100)  NOT NULL                COMMENT '菜品名称',
+  `category`    VARCHAR(50)   DEFAULT NULL            COMMENT '分类',
+  `price`       DECIMAL(10,2) NOT NULL DEFAULT 0.00   COMMENT '价格',
+  `description` VARCHAR(500)  DEFAULT NULL            COMMENT '描述',
+  `image`       VARCHAR(255)  DEFAULT NULL            COMMENT '图片地址',
+  `status`      TINYINT       NOT NULL DEFAULT 1      COMMENT '状态：1上架 0下架',
+  `create_time` DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_shop_id` (`shop_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='菜品表';
+
+-- 测试数据（listByShop/1 会返回这两条）
+INSERT IGNORE INTO `dish` (`id`, `shop_id`, `dish_name`, `category`, `price`, `description`, `status`) VALUES
+(1, 1, '黄焖鸡米饭',   '套餐', 15.00, '招牌黄焖鸡',     1),
+(2, 1, '西红柿鸡蛋面', '面食', 12.00, '家常口味',       1);
+
+
+-- ================================================================================
+-- 4. stock_db 库存库（库存服务，端口 8005）
+-- ================================================================================
+CREATE DATABASE IF NOT EXISTS `stock_db` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+USE `stock_db`;
+
+CREATE TABLE IF NOT EXISTS `stock` (
+  `id`          BIGINT   NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `dish_id`     BIGINT   NOT NULL                COMMENT '菜品ID',
+  `total`       INT      NOT NULL DEFAULT 0      COMMENT '总库存',
+  `available`   INT      NOT NULL DEFAULT 0      COMMENT '可用库存',
+  `status`      TINYINT  NOT NULL DEFAULT 1      COMMENT '状态：1正常 0冻结',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_dish_id` (`dish_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='库存表';
+
+-- 测试数据（deduct 扣库存测试用：dish_id=1, total=100, available=100）
+INSERT IGNORE INTO `stock` (`id`, `dish_id`, `total`, `available`, `status`) VALUES
+(1, 1, 100, 100, 1),
+(2, 2, 50,  50,  1);
+
+
+-- ================================================================================
+-- 5. order_db 订单库（订单服务，端口 8003）
+-- ================================================================================
+CREATE DATABASE IF NOT EXISTS `order_db` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+USE `order_db`;
+
+-- 表名用 orders，避免与 MySQL 保留字 order 冲突
+CREATE TABLE IF NOT EXISTS `orders` (
+  `id`           BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `order_no`     VARCHAR(64)   NOT NULL                COMMENT '订单号',
+  `user_id`      BIGINT        NOT NULL                COMMENT '下单用户ID',
+  `shop_id`      BIGINT        NOT NULL                COMMENT '店铺ID',
+  `total_amount` DECIMAL(10,2) NOT NULL DEFAULT 0.00   COMMENT '订单总金额',
+  `status`       TINYINT       NOT NULL DEFAULT 0      COMMENT '状态：0待支付 1待接单 2配送中 3已完成 4已取消',
+  `remark`       VARCHAR(255)  DEFAULT NULL            COMMENT '备注',
+  `create_time`  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time`  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_order_no` (`order_no`),
+  KEY `idx_user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单表';
+
+CREATE TABLE IF NOT EXISTS `order_item` (
+  `id`          BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `order_no`    VARCHAR(64)   NOT NULL                COMMENT '订单号',
+  `dish_id`     BIGINT        NOT NULL                COMMENT '菜品ID',
+  `dish_name`   VARCHAR(100)  DEFAULT NULL            COMMENT '菜品名称(快照)',
+  `price`       DECIMAL(10,2) NOT NULL DEFAULT 0.00   COMMENT '单价',
+  `quantity`    INT           NOT NULL DEFAULT 1      COMMENT '数量',
+  `amount`      DECIMAL(10,2) NOT NULL DEFAULT 0.00   COMMENT '小计',
+  `create_time` DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_order_no` (`order_no`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单明细表';
+
+
+-- ================================================================================
+-- 6. pay_db 支付库（支付服务，端口 8006）
+-- ================================================================================
+CREATE DATABASE IF NOT EXISTS `pay_db` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+USE `pay_db`;
+
+CREATE TABLE IF NOT EXISTS `payment` (
+  `id`          BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `order_no`    VARCHAR(64)   NOT NULL                COMMENT '订单号',
+  `user_id`     BIGINT        NOT NULL                COMMENT '用户ID',
+  `amount`      DECIMAL(10,2) NOT NULL DEFAULT 0.00   COMMENT '支付金额',
+  `pay_type`    VARCHAR(20)   DEFAULT NULL            COMMENT '支付方式：ALIPAY/WECHAT/BALANCE',
+  `status`      TINYINT       NOT NULL DEFAULT 0      COMMENT '状态：0未支付 1已支付 2已退款',
+  `create_time` DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_order_no` (`order_no`),
+  KEY `idx_user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='支付表';
+
+
+-- ================================================================================
+-- 7. Seata 分布式事务 —— undo_log 表（AT 模式回滚日志）
+--    参与全局事务的库都要建：这里在 order_db 和 stock_db 各建一张
+-- ================================================================================
+USE `order_db`;
+CREATE TABLE IF NOT EXISTS `undo_log` (
+  `id`            BIGINT(20)   NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `branch_id`     BIGINT(20)   NOT NULL                COMMENT '分支事务ID',
+  `xid`           VARCHAR(100) NOT NULL                COMMENT '全局事务ID',
+  `context`       VARCHAR(128) NOT NULL                COMMENT '上下文',
+  `rollback_info` LONGBLOB     NOT NULL                COMMENT '回滚日志',
+  `log_status`    INT(11)      NOT NULL                COMMENT '日志状态：0正常 1全局回滚完成',
+  `log_created`   DATETIME     NOT NULL                COMMENT '创建时间',
+  `log_modified`  DATETIME     NOT NULL                COMMENT '修改时间',
+  `ext`           VARCHAR(100) DEFAULT NULL            COMMENT '扩展字段',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `ux_undo_log` (`xid`, `branch_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Seata 回滚日志表';
+
+USE `stock_db`;
+CREATE TABLE IF NOT EXISTS `undo_log` (
+  `id`            BIGINT(20)   NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `branch_id`     BIGINT(20)   NOT NULL                COMMENT '分支事务ID',
+  `xid`           VARCHAR(100) NOT NULL                COMMENT '全局事务ID',
+  `context`       VARCHAR(128) NOT NULL                COMMENT '上下文',
+  `rollback_info` LONGBLOB     NOT NULL                COMMENT '回滚日志',
+  `log_status`    INT(11)      NOT NULL                COMMENT '日志状态：0正常 1全局回滚完成',
+  `log_created`   DATETIME     NOT NULL                COMMENT '创建时间',
+  `log_modified`  DATETIME     NOT NULL                COMMENT '修改时间',
+  `ext`           VARCHAR(100) DEFAULT NULL            COMMENT '扩展字段',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `ux_undo_log` (`xid`, `branch_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Seata 回滚日志表';
+
+
+-- ================================================================================
+-- 8. user_db 补充：OAuth2.0 统一认证相关表（令牌持久化入数据库）
+-- ================================================================================
+USE `user_db`;
+
+CREATE TABLE IF NOT EXISTS `oauth_client_details` (
+  `client_id`               VARCHAR(256)  NOT NULL,
+  `resource_ids`            VARCHAR(256)  DEFAULT NULL,
+  `client_secret`           VARCHAR(256)  DEFAULT NULL,
+  `scope`                   VARCHAR(256)  DEFAULT NULL,
+  `authorized_grant_types`  VARCHAR(256)  DEFAULT NULL,
+  `web_server_redirect_uri` VARCHAR(256)  DEFAULT NULL,
+  `authorities`             VARCHAR(256)  DEFAULT NULL,
+  `access_token_validity`   INT(11)       DEFAULT NULL,
+  `refresh_token_validity`  INT(11)       DEFAULT NULL,
+  `additional_information`  VARCHAR(4096) DEFAULT NULL,
+  `autoapprove`             VARCHAR(256)  DEFAULT NULL,
+  PRIMARY KEY (`client_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='OAuth2 客户端详情表';
+
+CREATE TABLE IF NOT EXISTS `oauth_access_token` (
+  `token_id`          VARCHAR(256) DEFAULT NULL,
+  `token`             BLOB,
+  `authentication_id` VARCHAR(256) NOT NULL,
+  `user_name`         VARCHAR(256) DEFAULT NULL,
+  `client_id`         VARCHAR(256) DEFAULT NULL,
+  `authentication`    BLOB,
+  `refresh_token`     VARCHAR(256) DEFAULT NULL,
+  PRIMARY KEY (`authentication_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='OAuth2 访问令牌表';
+
+CREATE TABLE IF NOT EXISTS `oauth_refresh_token` (
+  `token_id`       VARCHAR(256) DEFAULT NULL,
+  `token`          BLOB,
+  `authentication` BLOB
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='OAuth2 刷新令牌表';
+
+-- 客户端信息：client / secret（密码模式 + 刷新令牌，令牌有效期 3600s）
+INSERT IGNORE INTO `oauth_client_details`
+(`client_id`, `resource_ids`, `client_secret`, `scope`, `authorized_grant_types`,
+ `web_server_redirect_uri`, `authorities`, `access_token_validity`, `refresh_token_validity`, `autoapprove`)
+VALUES
+('client', NULL, 'secret', 'all', 'password,refresh_token', NULL, NULL, 3600, 7200, 'true');
+
+
+-- ================================================================================
+-- 9. seata 库 —— Seata Server 自身存储（全局事务/分支事务/锁，db 存储模式）
+--    对应 deploy/seata/seataServer.properties 中 store.db.url 指向的库
+-- ================================================================================
+CREATE DATABASE IF NOT EXISTS `seata` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+USE `seata`;
+
+CREATE TABLE IF NOT EXISTS `global_table` (
+  `xid`                       VARCHAR(128) NOT NULL,
+  `transaction_id`            BIGINT,
+  `status`                    TINYINT      NOT NULL,
+  `application_id`            VARCHAR(32),
+  `transaction_service_group` VARCHAR(32),
+  `transaction_name`          VARCHAR(128),
+  `timeout`                   INT,
+  `begin_time`                BIGINT,
+  `application_data`          VARCHAR(2000),
+  `gmt_create`                DATETIME,
+  `gmt_modified`              DATETIME,
+  PRIMARY KEY (`xid`),
+  KEY `idx_gmt_modified_status` (`gmt_modified`, `status`),
+  KEY `idx_transaction_id` (`transaction_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Seata 全局事务表';
+
+CREATE TABLE IF NOT EXISTS `branch_table` (
+  `branch_id`         BIGINT       NOT NULL,
+  `xid`               VARCHAR(128) NOT NULL,
+  `transaction_id`    BIGINT,
+  `resource_group_id` VARCHAR(32),
+  `resource_id`       VARCHAR(256),
+  `branch_type`       VARCHAR(8),
+  `status`            TINYINT,
+  `client_id`         VARCHAR(64),
+  `application_data`  VARCHAR(2000),
+  `gmt_create`        DATETIME(6),
+  `gmt_modified`      DATETIME(6),
+  PRIMARY KEY (`branch_id`),
+  KEY `idx_xid` (`xid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Seata 分支事务表';
+
+CREATE TABLE IF NOT EXISTS `lock_table` (
+  `row_key`        VARCHAR(128) NOT NULL,
+  `xid`            VARCHAR(96),
+  `transaction_id` BIGINT,
+  `branch_id`      BIGINT       NOT NULL,
+  `resource_id`    VARCHAR(256),
+  `table_name`     VARCHAR(32),
+  `pk`             VARCHAR(36),
+  `gmt_create`     DATETIME,
+  `gmt_modified`   DATETIME,
+  PRIMARY KEY (`row_key`),
+  KEY `idx_branch_id` (`branch_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Seata 全局锁表';

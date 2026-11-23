@@ -1,0 +1,5 @@
+cn\js\ccit\pay\controller\PayController.class
+cn\js\ccit\pay\PayApplication.class
+cn\js\ccit\pay\entity\Payment.class
+cn\js\ccit\pay\service\PaymentService.class
+cn\js\ccit\pay\mapper\PaymentMapper.class

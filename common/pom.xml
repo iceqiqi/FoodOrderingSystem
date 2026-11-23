@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 1. 指向你的父工程 demo -->
+    <parent>
+        <groupId>cn.js.ccit</groupId>
+        <artifactId>demo</artifactId>
+        <version>1.0-SNAPSHOT</version>
+    </parent>
+
+    <!-- 2. 当前模块叫 common -->
+    <artifactId>common</artifactId>
+    <packaging>jar</packaging> <!-- common 是个普通的 jar 包 -->
+
+    <!-- 3. common 只需要最基础的依赖 -->
+    <dependencies>
+        <!-- Lombok：用来简化实体类的 get/set -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- Spring Web：因为你的 GlobalExceptionHandler 需要用到 Web 相关的注解 -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-web</artifactId>
+        </dependency>
+    </dependencies>
+</project>

@@ -1,0 +1,72 @@
+server:
+  port: 8003
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://127.0.0.1:3306/order_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false
+    username: root
+    password: 123456
+  zipkin:
+    base-url: http://127.0.0.1:9411
+  sleuth:
+    sampler:
+      probability: 1.0
+  boot:
+    admin:
+      client:
+        url: http://127.0.0.1:9090
+        instance:
+          prefer-ip: true
+  cloud:
+    sentinel:
+      transport:
+        dashboard: 127.0.0.1:8858
+        port: 8719
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+# OpenFeign 超时与日志级别
+feign:
+  client:
+    config:
+      default:
+        connectTimeout: 5000
+        readTimeout: 8000
+        loggerLevel: full
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: '*'
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+# Seata 1.4.2 客户端接入（全局事务发起方）
+seata:
+  enabled: true
+  application-id: ${spring.application.name}
+  tx-service-group: my_test_tx_group
+  registry:
+    type: nacos
+    nacos:
+      application: seata-server
+      server-addr: 127.0.0.1:8848
+      group: SEATA_GROUP
+      namespace: ""
+      cluster: default
+  config:
+    type: nacos
+    nacos:
+      server-addr: 127.0.0.1:8848
+      group: SEATA_GROUP
+      namespace: ""
+      data-id: seataServer.properties
+  service:
+    vgroup-mapping:
+      my_test_tx_group: default

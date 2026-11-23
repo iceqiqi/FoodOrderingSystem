@@ -1,0 +1,8 @@
+C:\Users\iceqi\Desktop\demo\order\src\main\java\cn\js\ccit\order\mapper\OrderMapper.java
+C:\Users\iceqi\Desktop\demo\order\src\main\java\cn\js\ccit\order\OrderApplication.java
+C:\Users\iceqi\Desktop\demo\order\src\main\java\cn\js\ccit\order\entity\Order.java
+C:\Users\iceqi\Desktop\demo\order\src\main\java\cn\js\ccit\order\feign\StockFeign.java
+C:\Users\iceqi\Desktop\demo\order\src\main\java\cn\js\ccit\order\config\SeataFeignConfig.java
+C:\Users\iceqi\Desktop\demo\order\src\main\java\cn\js\ccit\order\config\SentinelRuleConfig.java
+C:\Users\iceqi\Desktop\demo\order\src\main\java\cn\js\ccit\order\controller\OrderController.java
+C:\Users\iceqi\Desktop\demo\order\src\main\java\cn\js\ccit\order\service\OrderService.java

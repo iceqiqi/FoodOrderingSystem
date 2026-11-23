@@ -1,0 +1,8 @@
+cn\js\ccit\order\entity\Order.class
+cn\js\ccit\order\config\SeataFeignConfig.class
+cn\js\ccit\order\OrderApplication.class
+cn\js\ccit\order\config\SentinelRuleConfig.class
+cn\js\ccit\order\controller\OrderController.class
+cn\js\ccit\order\mapper\OrderMapper.class
+cn\js\ccit\order\service\OrderService.class
+cn\js\ccit\order\feign\StockFeign.class

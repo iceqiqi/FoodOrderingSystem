@@ -1,0 +1,6 @@
+cn\js\ccit\dish\config\SentinelParamFlowConfig.class
+cn\js\ccit\dish\service\DishService.class
+cn\js\ccit\dish\DishApplication.class
+cn\js\ccit\dish\controller\DishController.class
+cn\js\ccit\dish\entity\Dish.class
+cn\js\ccit\dish\mapper\DishMapper.class

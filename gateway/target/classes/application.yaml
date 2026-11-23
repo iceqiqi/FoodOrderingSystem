@@ -1,0 +1,40 @@
+server:
+  port: 8080
+
+spring:
+  cloud:
+    gateway:
+      # 动态路由：按 Nacos 中注册的服务名自动生成 /{服务名}/** -> lb://{服务名}
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+      routes:
+        # OAuth2 认证服务器端点（user 服务），保留完整路径 /oauth/**
+        - id: oauth
+          uri: lb://user
+          predicates:
+            - Path=/oauth/**
+  zipkin:
+    base-url: http://127.0.0.1:9411
+  sleuth:
+    sampler:
+      probability: 1.0
+  boot:
+    admin:
+      client:
+        url: http://127.0.0.1:9090
+        instance:
+          prefer-ip: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: '*'
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}

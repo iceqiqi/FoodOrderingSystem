@@ -1,0 +1,36 @@
+server:
+  port: 8004
+spring:
+  main:
+    # Spring Boot 2.6 + 旧版 spring-security-oauth2(@EnableAuthorizationServer) 的循环依赖规避
+    allow-circular-references: true
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://127.0.0.1:3306/user_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false
+    username: root
+    password: 123456
+  zipkin:
+    base-url: http://127.0.0.1:9411
+  sleuth:
+    sampler:
+      probability: 1.0
+  boot:
+    admin:
+      client:
+        url: http://127.0.0.1:9090
+        instance:
+          prefer-ip: true
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+management:
+  endpoints:
+    web:
+      exposure:
+        include: '*'
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: ${spring.application.name}

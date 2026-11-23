@@ -1,0 +1,6 @@
+cn\js\ccit\stock\StockApplication.class
+cn\js\ccit\stock\entity\Stock.class
+cn\js\ccit\stock\mapper\StockMapper.class
+cn\js\ccit\stock\service\StockService.class
+cn\js\ccit\stock\controller\StockController.class
+cn\js\ccit\stock\filter\SeataXidFilter.class
