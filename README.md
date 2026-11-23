@@ -231,3 +231,4 @@ curl -X POST "http://127.0.0.1:8080/order/create" \
 4. **OAuth2 循环依赖**：user 服务用 `@Lazy` + `spring.main.allow-circular-references: true` 规避 Spring Boot 2.6 / Security 5.6 的循环引用。
 5. **网关 WebClient 负载均衡隔离**：`@LoadBalanced WebClient.Builder` 不能作为唯一默认 Bean，否则会被 Spring Boot Admin 客户端误用，把 `http://127.0.0.1:9090` 当成服务名做负载均衡而报 503。现已拆成 `@Primary` 普通 Builder + 具名 `@LoadBalanced` Builder，鉴权过滤器按名称注入。
 6. **Seata 启动依赖**：order / stock 的 Seata 客户端启动时会向 Seata Server 建立连接，Seata Server 或 Nacos 未启动时会阻塞在 `Initializing Global Transaction Clients ...`，属正常现象——中间件就绪后即可快速完成启动。Docker 编排已通过健康检查 + `depends_on` 保证顺序。
+"# FooddOrderingSystem" 
